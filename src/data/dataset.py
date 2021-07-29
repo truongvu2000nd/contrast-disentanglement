@@ -1,6 +1,4 @@
-from warnings import simplefilter
 from PIL import Image
-from torch.utils import data
 from torchvision import transforms
 import os
 import numpy as np
@@ -9,10 +7,7 @@ from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder, CelebA
 from torchvision import transforms
 import matplotlib.pyplot as plt
-from torchvision.transforms.transforms import Resize
 import PIL
-
-from model import AttGANGenerator
 
 
 class PairsLFW(Dataset):
@@ -153,7 +148,8 @@ class CASIAPair(ImageFolder):
 
 class CelebAPair(CelebA):
     def __getitem__(self, index):
-        X = PIL.Image.open(os.path.join(self.root, self.base_folder, "img_align_celeba", self.filename[index]))
+        X = PIL.Image.open(os.path.join(
+            self.root, self.base_folder, "img_align_celeba", self.filename[index]))
 
         target = []
         for t in self.target_type:
@@ -167,7 +163,8 @@ class CelebAPair(CelebA):
                 target.append(self.landmarks_align[index, :])
             else:
                 # TODO: refactor with utils.verify_str_arg
-                raise ValueError("Target type \"{}\" is not recognized.".format(t))
+                raise ValueError(
+                    "Target type \"{}\" is not recognized.".format(t))
 
         if self.transform is not None:
             pos_1 = self.transform(X)
@@ -184,68 +181,10 @@ class CelebAPair(CelebA):
         return pos_1, pos_2, target
 
 
-class AttGANTransform(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __init__(self, attgan) -> None:
+class DFW(Dataset):
+    def __init__(self) -> None:
         super().__init__()
-        self.attgan = attgan
-
-    @torch.no_grad()
-    def __call__(self, img):
-        img = img.to(next(self.attgan.parameters()).device)
-        img = img * 2 - 1
-        img = img.unsqueeze(0)
-        att_b = torch.rand((1, 13)) * 2 - 1
-        out_img = self.attgan(img, att_b).squeeze(0)
-        return (out_img + 1) / 2
-
-
-def get_color_distortion(s=0.5):
-    color_jitter = transforms.ColorJitter(0.8*s, 0.8*s, 0.8*s, 0.2*s)
-    rnd_color_jitter = transforms.RandomApply([color_jitter], p=0.8)
-    rnd_gray = transforms.RandomGrayscale(p=0.2)
-    color_distort = transforms.Compose([rnd_color_jitter, rnd_gray])
-    return color_distort
-
-
-def get_simclr_pipeline_transform(args):
-    data_transforms = []
-    data_transforms.append(transforms.ToTensor())
-    if args.random_resized_crop:
-        data_transforms.append(transforms.RandomResizedCrop(size=args.img_sz))
-    if args.h_flip:
-        data_transforms.append(transforms.RandomHorizontalFlip(p=0.5))
-    if args.color_distort:
-        data_transforms.append(get_color_distortion(s=0.5))
-    if args.attgan_transform:
-        data_transforms.append(AttGANTransform(args.attgan))
-    
-    data_transforms = transforms.Compose(data_transforms)
-    return data_transforms
 
 
 if __name__ == '__main__':
-
-    class ARGS:
-        img_sz = 128
-        attgan_transform = True
-        attgan = AttGANGenerator().to("cpu")
-        state_dict = torch.load("src/face-editing/attgan.pth")
-        attgan.load_state_dict(state_dict)
-        random_resized_crop = True
-        h_flip = True
-        color_distort = True
-
-    args = ARGS()
-    train_data = PeopleLFWPair(
-                root='../datasets/LabeledFaceWild', split='train',
-                transform=get_simclr_pipeline_transform(args))
-
-    # train_data = CASIAPair(
-    #             root='../datasets/CASIA-WebFace',
-    #             transform=get_simclr_pipeline_transform())
-
-    x = next(iter(train_data))
-    plt.imshow(train_data[5][0].permute(1, 2, 0).cpu().numpy())
-    plt.show()
+    pass
